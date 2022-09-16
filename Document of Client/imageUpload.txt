@@ -1,0 +1,117 @@
+
+
+Methods on ___________1
+
+ Step 1
+
+export const useAvatarUpload = () => {
+  const uploadUrl = '/api/upload/avatar';
+  const [image, setImage] = useState(null);
+  const [fileLink, setFileLink] = useState('');
+  const uploadImage = async () => {
+    try {
+      const data = new FormData();
+      data.append('avatar', image);
+      await dynamicAPI('post', uploadUrl, data)
+        .then((data) => {
+          console.log(data);
+          setFileLink(data.secure_url);
+        })
+        .catch((e) => {
+          console.log(e);
+        });
+    } catch (error) {
+      console.log(error);
+    }
+  };
+  return {
+    image,
+    setImage,
+    fileLink,
+    uploadImage,
+  };
+};
+
+step _two
+
+
+export const useUserUpdate = () => {
+  const { image, setImage, uploadImage, fileLink } = useAvatarUpload();
+  console.log(fileLink);
+  const queryClient = useQueryClient();
+  const { mutateAsync,isLoading } = useMutation(userUpdate, {
+    retry: 0,
+  });
+
+  const {
+    register,
+    handleSubmit,
+
+    formState: { errors },
+  } = useForm<UserUpdateParams>();
+  const onSubmit = handleSubmit(async (payload) => {
+    try {
+     await uploadImage();
+      await mutateAsync(
+        {
+          name: payload.name,
+          password: payload.password,
+          avatar: fileLink,
+        },
+        {
+          onSuccess: async () => {
+            toast.success('user successfully updated');
+            await queryClient.invalidateQueries(['me']);
+          },
+        }
+      );
+    } catch (error) {
+      toast.error(error);
+    }
+  });
+
+  return {
+    onSubmit,
+    register,
+    errors,
+    setImage,
+    image,
+    isLoading
+  };
+};
+
+
+Methods Two
+
+
+import dynamicAPI from "@api/axios";
+import { useState } from "react";
+import { useMutation } from "react-query";
+
+const useImageUpload = () => {
+  const [images, setImages] = useState([]);
+  const cloudinary_url = "https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload"
+  const { isLoading: uploading, mutateAsync: uploadImage } = useMutation(
+    async (data:any) => {
+      const formData = new FormData();
+      formData.append("avatar", data);
+      formData.append("upload_preset",process.env.NEXT_PUBLIC_UPLOAD_PRESET);
+      formData.append("cloud_name", process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME);
+
+      return await dynamicAPI('post',cloudinary_url,formData)
+    },
+    {
+      onSuccess: ({ data }) => {
+        console.log("Image uploaded successfully");
+        setImages([...images, data.secure_url]);
+      },
+      onError: (error) => {
+        console.log(error);
+      },
+    }
+  );
+
+  return { images, uploadImage, uploading };
+};
+
+export default useImageUpload;
